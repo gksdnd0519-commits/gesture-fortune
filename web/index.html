@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>제스처 운세</title>
+  <style>
+    :root {
+      --bg: #120d24;
+      --panel: rgba(255, 255, 255, 0.06);
+      --border: rgba(255, 255, 255, 0.12);
+      --text: #f1eefc;
+      --muted: #a9a3c4;
+      --accent: #ffd166;
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 20% 0%, #3b2672 0%, transparent 50%),
+                  radial-gradient(circle at 90% 100%, #1d3f6e 0%, transparent 45%), var(--bg);
+    }
+    header { text-align: center; padding: 28px 16px 8px; }
+    h1 { margin: 0; font-size: 34px; letter-spacing: 2px; }
+    header p { margin: 8px 0 0; color: var(--muted); }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(0, 640px) minmax(280px, 380px);
+      gap: 24px;
+      justify-content: center;
+      padding: 20px 16px 40px;
+    }
+    @media (max-width: 960px) { main { grid-template-columns: minmax(0, 640px); } }
+
+    .stage {
+      position: relative;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #000;
+      aspect-ratio: 4 / 3;
+    }
+    #view { width: 100%; height: 100%; display: block; }
+    #video { display: none; }
+    #placeholder {
+      position: absolute; inset: 0;
+      display: grid; place-items: center;
+      color: var(--muted); font-size: 18px;
+    }
+    .hold { height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; margin-top: 12px; overflow: hidden; }
+    #hold-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #ffb703, #ffd166); transition: width 80ms linear; }
+    #status { margin-top: 10px; color: var(--muted); min-height: 1.4em; }
+
+    aside { display: flex; flex-direction: column; gap: 16px; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    select {
+      width: 100%; padding: 10px; border-radius: 10px; font: inherit; font-size: 15px;
+      background: #1e1838; color: var(--text); border: 1px solid var(--border);
+    }
+    #model-info { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+
+    #card {
+      min-height: 320px;
+      border-radius: 18px;
+      padding: 24px;
+      border: 1px solid rgba(255, 209, 102, 0.35);
+      background: linear-gradient(160deg, rgba(255, 209, 102, 0.12), rgba(142, 78, 198, 0.15));
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.35);
+    }
+    #card.reveal { animation: flip 0.7s ease; }
+    @keyframes flip {
+      0% { transform: perspective(800px) rotateY(90deg) scale(0.9); opacity: 0; }
+      100% { transform: perspective(800px) rotateY(0) scale(1); opacity: 1; }
+    }
+    #card-empty { height: 270px; display: grid; place-items: center; text-align: center; color: var(--muted); line-height: 1.7; }
+    #card-empty .orb { font-size: 56px; display: block; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 50% { transform: translateY(-8px); } }
+    .card-title { font-size: 14px; color: var(--muted); letter-spacing: 3px; }
+    #grade { font-size: 44px; font-weight: bold; margin: 6px 0 12px; }
+    #fortune-text { font-size: 18px; line-height: 1.7; margin: 0 0 18px; word-break: keep-all; }
+    .lucky { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .lucky div { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px; text-align: center; }
+    .lucky small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+    .lucky strong { font-size: 16px; }
+    #lucky-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 4px; border: 1px solid rgba(255,255,255,0.4); vertical-align: -1px; }
+    #card-meta { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔮 제스처 운세</h1>
+    <p>정한 제스처를 1.5초 동안 유지하면 오늘의 운세가 나와요</p>
+  </header>
+
+  <main>
+    <section>
+      <div class="stage">
+        <canvas id="view" width="640" height="480"></canvas>
+        <div id="placeholder">카메라 준비 중…</div>
+        <video id="video" playsinline muted></video>
+      </div>
+      <div class="hold"><div id="hold-bar"></div></div>
+      <div id="status">불러오는 중…</div>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <label for="target">운세를 뽑을 제스처</label>
+        <select id="target"></select>
+        <p id="model-info"></p>
+      </div>
+
+      <div id="card">
+        <div id="card-empty">
+          <div><span class="orb">🔮</span>제스처를 하면<br>오늘의 운세가 여기에 나타나요</div>
+        </div>
+        <div id="card-body" hidden>
+          <div class="card-title">TODAY'S FORTUNE</div>
+          <div id="grade"></div>
+          <p id="fortune-text"></p>
+          <div class="lucky">
+            <div><small>행운의 색</small><strong><span id="lucky-swatch"></span><span id="lucky-color"></span></strong></div>
+            <div><small>행운의 숫자</small><strong id="lucky-number"></strong></div>
+            <div><small>행운의 물건</small><strong id="lucky-item"></strong></div>
+          </div>
+          <p id="card-meta"></p>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
